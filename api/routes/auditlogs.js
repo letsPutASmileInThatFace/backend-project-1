@@ -8,6 +8,7 @@ router.post("/", async (req, res, next) => {
   try {
     let body = req.body;
     let query = {};
+
     if (body.begin_date && body.end_date) {
       query.created_at = {
         $gte: moment(body.begin_date),
