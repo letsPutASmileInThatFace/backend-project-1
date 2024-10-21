@@ -4,4 +4,10 @@ module.exports = {
   CONNECTION_STRING:
     process.env.CONNECTION_STRING ||
     "mongodb://localhost:27017/backend-project-1",
+  JWT: {
+    SECRET: "123456",
+    EXPIRE_TIME: !isNaN(parseInt(process.env.TOKEN_EXPIRE_TIME))
+      ? parseInt(process.env.TOKEN_EXPIRE_TIME)
+      : 86400,
+  },
 };
