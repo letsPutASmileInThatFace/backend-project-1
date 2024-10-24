@@ -10,9 +10,124 @@ const UserRoles = require("../db/models/UserRoles");
 const Roles = require("../db/models/Roles");
 const config = require("../config");
 const jwt_simple = require("jwt-simple");
+const RolePrivileges = require("../db/models/RolePrivileges");
+const auth = require("../lib/auth")();
+const role_privileges = require("../config/role_privileges");
 
+router.post("/register", async (req, res) => {
+  let body = req.body;
+  try {
+    let user = await Users.findOne({});
+    if (user) {
+      return res.sendStatus(Enum.HTTP_CODES.NOT_FOUND);
+    }
+    if (!body.email)
+      throw new CustomError(
+        Enum.HTTP_CODES.BAD_REQUEST,
+        "Validation Error",
+        "Email is required"
+      );
+    if (!is.email(body.email))
+      throw new CustomError(
+        Enum.HTTP_CODES.BAD_REQUEST,
+        "Validation Error",
+        "Email is not valid"
+      );
+    if (!body.password)
+      throw new CustomError(
+        Enum.HTTP_CODES.BAD_REQUEST,
+        "Validation Error",
+        "Password is required"
+      );
+
+    if (body.password.length < Enum.PASS_LENGTH)
+      throw new CustomError(
+        Enum.HTTP_CODES.BAD_REQUEST,
+        "Validation Error",
+        "Password must be at least 8 characters"
+      );
+    let password = bcrypt.hashSync(body.password, bcrypt.genSaltSync(8), null);
+
+    let createdUser = await Users.create({
+      email: body.email,
+      password,
+      is_active: true,
+      first_name: body.first_name,
+      last_name: body.last_name,
+      phone_number: body.phone_number,
+    });
+    let role = await Roles.create({
+      role_name: Enum.SUPER_ADMIN,
+      is_active: true,
+      created_by: createdUser._id,
+    });
+    await UserRoles.create({
+      role_id: role._id,
+      user_id: createdUser._id,
+    });
+    let privileges = role_privileges.privileges;
+    privileges.forEach(async (priv) => {
+      await RolePrivileges.create({
+        role_id: role._id,
+        permission: priv.key,
+        created_by: createdUser._id,
+      });
+    });
+    res
+      .status(Enum.HTTP_CODES.CREATED)
+      .json(
+        Response.successResponse({ success: true }, Enum.HTTP_CODES.CREATED)
+      );
+  } catch (err) {
+    let errorResponse = Response.errorResponse(err);
+    res.status(errorResponse.code).json(errorResponse);
+  }
+});
+
+router.post("/auth", async (req, res) => {
+  try {
+    let { email, password } = req.body;
+    Users.validateFieldsBeforeAuth(email, password);
+    let user = await Users.findOne({ email });
+    if (!user)
+      throw new CustomError(
+        Enum.HTTP_CODES.UNAUTHORIZED,
+        "Auth Error",
+        "Email or password is wrong"
+      );
+    if (!bcrypt.compareSync(password, user.password))
+      throw new CustomError(
+        Enum.HTTP_CODES.UNAUTHORIZED,
+        "Auth Error",
+        "Email or password is wrong"
+      );
+
+    let payload = {
+      id: user._id,
+      exp: Math.floor(Date.now() / 1000) * config.JWT.EXPIRE_TIME,
+    };
+    let token = jwt_simple.encode(payload, config.JWT.SECRET);
+    let userData = {
+      _id: user._id,
+      email: user.email,
+      first_name: user.first_name,
+      last_name: user.last_name,
+      phone_number: user.phone_number,
+    };
+    res.json(
+      Response.successResponse({ token, user: userData }, Enum.HTTP_CODES.OK)
+    );
+  } catch (err) {
+    let errorResponse = Response.errorResponse(err);
+    res.status(errorResponse.code).json(errorResponse);
+  }
+});
+
+router.all("*", auth.authenticate(), (req, res, next) => {
+  next();
+});
 /* GET users listing. */
-router.get("/", async (req, res, next) => {
+router.get("/", auth.checkRoles("user_view"), async (req, res, next) => {
   try {
     let users = await Users.find({});
     res.json(Response.successResponse(users));
@@ -22,7 +137,7 @@ router.get("/", async (req, res, next) => {
   }
 });
 
-router.post("/add", async (req, res) => {
+router.post("/add", auth.checkRoles("user_add"), async (req, res) => {
   let body = req.body;
   try {
     if (!body.email)
@@ -95,7 +210,7 @@ router.post("/add", async (req, res) => {
   }
 });
 
-router.post("/update", async (req, res) => {
+router.post("/update", auth.checkRoles("user_update"), async (req, res) => {
   try {
     let body = req.body;
     let updates = {};
@@ -150,7 +265,7 @@ router.post("/update", async (req, res) => {
   }
 });
 
-router.post("/delete", async (req, res) => {
+router.post("/delete", auth.checkRoles("user_delete"), async (req, res) => {
   try {
     let body = req.body;
     if (!body._id)
@@ -168,105 +283,4 @@ router.post("/delete", async (req, res) => {
   }
 });
 
-router.post("/register", async (req, res) => {
-  let body = req.body;
-  try {
-    let user = await Users.findOne({});
-    if (user) {
-      return res.sendStatus(Enum.HTTP_CODES.NOT_FOUND);
-    }
-    if (!body.email)
-      throw new CustomError(
-        Enum.HTTP_CODES.BAD_REQUEST,
-        "Validation Error",
-        "Email is required"
-      );
-    if (!is.email(body.email))
-      throw new CustomError(
-        Enum.HTTP_CODES.BAD_REQUEST,
-        "Validation Error",
-        "Email is not valid"
-      );
-    if (!body.password)
-      throw new CustomError(
-        Enum.HTTP_CODES.BAD_REQUEST,
-        "Validation Error",
-        "Password is required"
-      );
-
-    if (body.password.length < Enum.PASS_LENGTH)
-      throw new CustomError(
-        Enum.HTTP_CODES.BAD_REQUEST,
-        "Validation Error",
-        "Password must be at least 8 characters"
-      );
-    let password = bcrypt.hashSync(body.password, bcrypt.genSaltSync(8), null);
-
-    let createdUser = await Users.create({
-      email: body.email,
-      password,
-      is_active: true,
-      first_name: body.first_name,
-      last_name: body.last_name,
-      phone_number: body.phone_number,
-    });
-    let role = await Roles.create({
-      role_name: Enum.SUPER_ADMIN,
-      is_active: true,
-      created_by: createdUser._id,
-    });
-    await UserRoles.create({
-      role_id: role._id,
-      user_id: createdUser._id,
-    });
-
-    res
-      .status(Enum.HTTP_CODES.CREATED)
-      .json(
-        Response.successResponse({ success: true }, Enum.HTTP_CODES.CREATED)
-      );
-  } catch (err) {
-    let errorResponse = Response.errorResponse(err);
-    res.status(errorResponse.code).json(errorResponse);
-  }
-});
-
-router.post("/auth", async (req, res) => {
-  try {
-    let { email, password } = req.body;
-    Users.validateFieldsBeforeAuth(email, password);
-    let user = await Users.findOne({ email });
-    if (!user)
-      throw new CustomError(
-        Enum.HTTP_CODES.UNAUTHORIZED,
-        "Auth Error",
-        "Email or password is wrong"
-      );
-    if (!bcrypt.compareSync(password, user.password))
-      throw new CustomError(
-        Enum.HTTP_CODES.UNAUTHORIZED,
-        "Auth Error",
-        "Email or password is wrong"
-      );
-
-    let payload = {
-      id: user._id,
-      exp: Math.floor(Date.now() / 1000) * config.JWT.EXPIRE_TIME,
-    };
-    let token = jwt_simple.encode(payload, config.JWT.SECRET);
-    let userData = {
-      _id: user._id,
-      email: user.email,
-      first_name: user.first_name,
-      last_name: user.last_name,
-      phone_number: user.phone_number,
-    };
-    res.json(
-      Response.successResponse({ token, user: userData }, Enum.HTTP_CODES.OK)
-    );
-  } catch (err) {
-    let errorResponse = Response.errorResponse(err);
-    res.status(errorResponse.code).json(errorResponse);
-  }
-});
 module.exports = router;
