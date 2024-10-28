@@ -6,8 +6,9 @@ const CustomError = require("../lib/Error");
 const Enum = require("../config/Enum");
 const AuditLogs = require("../lib/Auditlogs");
 const logger = require("../lib/logger/LoggerClass");
-
 const auth = require("../lib/auth")();
+const config = require("../config");
+const i18n = new (require("../lib/i18n"))(config.DEFAULT_LANGUAGE);
 
 router.all("*", auth.authenticate(), (req, res, next) => {
   next();
@@ -31,8 +32,10 @@ router.post("/add", auth.checkRoles("category_add"), async (req, res) => {
     if (!body.name)
       throw new CustomError(
         Enum.HTTP_CODES.BAD_REQUEST,
-        "Validation Error",
-        "Name is required"
+        i18n.translate("COMMON.VALIDATION_ERROR", req.user.language),
+        i18n.translate("COMMON.FIELD_MUST_BE_FILLED", req.user.language, [
+          "name",
+        ])
       );
     let category = new Categories({
       name: body.name,
@@ -64,8 +67,10 @@ router.post("/update", auth.checkRoles("category_update"), async (req, res) => {
     if (!body._id)
       throw new CustomError(
         Enum.HTTP_CODES.BAD_REQUEST,
-        "Validation Error",
-        "_id is required"
+        i18n.translate("COMMON.VALIDATION_ERROR", req.user.language),
+        i18n.translate("COMMON.FIELD_MUST_BE_FILLED", req.user.language, [
+          "_id",
+        ])
       );
 
     let updates = {};
@@ -91,8 +96,10 @@ router.post("/delete", auth.checkRoles("category_delete"), async (req, res) => {
     if (!body._id)
       throw new CustomError(
         Enum.HTTP_CODES.BAD_REQUEST,
-        "Validation Error",
-        "_id is required"
+        i18n.translate("COMMON.VALIDATION_ERROR", req.user.language),
+        i18n.translate("COMMON.FIELD_MUST_BE_FILLED", req.user.language, [
+          "_id",
+        ])
       );
     await Categories.findOneAndDelete({ _id: body._id });
     AuditLogs.info(req.user?.email, "Categories", "DELETE", { _id: body._id });

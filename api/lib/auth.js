@@ -32,6 +32,7 @@ module.exports = () => {
             email: user.email,
             first_name: user.first_name,
             last_name: user.last_name,
+            language: user.language,
             exp: Math.floor(Date.now() / 1000) * config.JWT.EXPIRE_TIME,
           });
         } else {
