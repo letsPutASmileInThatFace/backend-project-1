@@ -9,6 +9,7 @@ const logger = require("../lib/logger/LoggerClass");
 const auth = require("../lib/auth")();
 const config = require("../config");
 const i18n = new (require("../lib/i18n"))(config.DEFAULT_LANGUAGE);
+const emitter = require("../lib/Emitter");
 
 router.all("*", auth.authenticate(), (req, res, next) => {
   next();
@@ -52,6 +53,9 @@ router.post("/add", auth.checkRoles("category_add"), async (req, res) => {
       updated_at: category.updated_at,
     });
     logger.info(req.user?.email, "Categories", "ADD", category);
+    emitter.getEmitter("notifications").emit("messages", {
+      message: category.name + " is added",
+    });
     res.json(Response.successResponse({ success: true }));
   } catch (err) {
     logger.error(req.user?.email, "Categories", "ADD", err);
