@@ -31,7 +31,7 @@ router.post("/", auth.checkRoles("auditLogs_view"), async (req, res, next) => {
       .limit(body.limit);
     res.json(Response.successResponse(auditLogs));
   } catch (err) {
-    let errorResponse = Response.errorResponse(err);
+    let errorResponse = Response.errorResponse(err, req.user?.language);
     res.status(errorResponse.code).json(errorResponse);
   }
 });
