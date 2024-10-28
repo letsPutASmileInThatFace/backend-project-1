@@ -11,4 +11,5 @@ module.exports = {
       : 86400,
   },
   DEFAULT_LANGUAGE: process.env.DEFAULT_LANGUAGE || "EN",
+  FILE_UPLOAD_PATH: process.env.FILE_UPLOAD_PATH,
 };
